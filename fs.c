@@ -247,6 +247,9 @@ iget(uint dev, uint inum)
   ip->inum = inum;
   ip->ref = 1;
   ip->flags = 0;
+  ip->proc_pid = -1;
+  // cprintf("iget change sub_type: %d\n", ip->sub_type);
+  // ip->sub_type = NONE;
   release(&icache.lock);
 
   return ip;
@@ -331,6 +334,9 @@ iput(struct inode *ip)
     iupdate(ip);
     acquire(&icache.lock);
     ip->flags = 0;
+    ip->proc_pid = -1;
+    // cprintf("iputt change sub_type: %d\n", ip->sub_type);
+    // ip->sub_type = 0;
     wakeup(ip);
   }
   ip->ref--;
@@ -510,7 +516,7 @@ dirlookup(struct inode *dp, char *name, uint *poff)
   uint off, inum;
   struct dirent de;
   struct inode *ip;
-
+  cprintf("dirlookup for: %s\n",name);
   if(dp->type != T_DIR && !IS_DEV_DIR(dp))
     panic("dirlookup not DIR");
 
@@ -550,6 +556,7 @@ dirlink(struct inode *dp, char *name, uint inum)
   // Check that name is not present.
   if((ip = dirlookup(dp, name, 0)) != 0){
     iput(ip);
+    cprintf("dirlookup none 0\n");
     return -1;
   }
 
@@ -563,8 +570,9 @@ dirlink(struct inode *dp, char *name, uint inum)
 
   strncpy(de.name, name, DIRSIZ);
   de.inum = inum;
-  if(writei(dp, (char*)&de, off, sizeof(de)) != sizeof(de))
+  if(writei(dp, (char*)&de, off, sizeof(de)) != sizeof(de)){
     panic("dirlink");
+  }
   
   return 0;
 }

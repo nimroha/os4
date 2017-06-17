@@ -6,6 +6,7 @@
 #include "x86.h"
 #include "proc.h"
 #include "spinlock.h"
+#include "stat.h"
 
 struct {
   struct spinlock lock;
@@ -98,6 +99,7 @@ userinit(void)
 
   safestrcpy(p->name, "initcode", sizeof(p->name));
   p->cwd = namei("/");
+  // p->proc_inode = icreate("proc/1" ,T_DEV, 2, 1, PROC, 1);
 
   p->state = RUNNABLE;
 }
@@ -130,6 +132,7 @@ fork(void)
 {
   int i, pid;
   struct proc *np;
+  char path[] = "proc/0";
 
   // Allocate process.
   if((np = allocproc()) == 0)
@@ -157,7 +160,8 @@ fork(void)
   safestrcpy(np->name, proc->name, sizeof(proc->name));
  
   pid = np->pid;
-
+  path[5] += pid;
+  // np->proc_inode = icreate(path ,T_DEV, 2, 1, PROC, 1);
   // lock to force the compiler to emit the np->state write last.
   acquire(&ptable.lock);
   np->state = RUNNABLE;
@@ -462,4 +466,17 @@ procdump(void)
     }
     cprintf("\n");
   }
+}
+
+
+struct proc*
+lookup_proc_py_pid(int pid)
+{
+   struct proc *p;
+
+   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->pid == pid)
+      return p;
+  }
+  return 0;
 }

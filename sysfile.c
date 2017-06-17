@@ -14,6 +14,7 @@
 #include "file.h"
 #include "fcntl.h"
 
+
 // Fetch the nth word-sized system call argument as a file descriptor
 // and return both the descriptor and the corresponding struct file.
 static int
@@ -236,7 +237,7 @@ bad:
 }
 
 static struct inode*
-create(char *path, short type, short major, short minor)
+create(char *path, short type, short major, short minor, enum inode_sub_type sub_type)
 {
   uint off;
   struct inode *ip, *dp;
@@ -246,7 +247,7 @@ create(char *path, short type, short major, short minor)
     return 0;
   ilock(dp);
 
-  if (dp->type == T_DEV) {
+  if (dp->type == T_DEV && (dp->sub_type != PROC_DIR || dp->sub_type != PROC)) {
     iunlockput(dp);
     return 0;
   }
@@ -267,6 +268,8 @@ create(char *path, short type, short major, short minor)
   ip->major = major;
   ip->minor = minor;
   ip->nlink = 1;
+  ip->proc_pid = -1;
+  ip->sub_type = sub_type;
   iupdate(ip);
 
   if(type == T_DIR){  // Create . and .. entries.
@@ -277,11 +280,36 @@ create(char *path, short type, short major, short minor)
       panic("create dots");
   }
 
+  if( IS_DEV_DIR(ip)){  // Create . and .. entries.
+    dp->nlink++;  // for ".."
+    iupdate(dp);
+    // No ip->nlink++ for ".": avoid cyclic ref count.
+    if(dirlink(ip, ".", ip->inum) < 0 || dirlink(ip, "..", dp->inum) < 0)
+      panic("dev create dots");
+  }
+
   if(dirlink(dp, name, ip->inum) < 0)
-    panic("create: dirlink");
+    panic("dev create: dirlink");
 
   iunlockput(dp);
 
+  return ip;
+}
+
+struct inode*
+icreate(char *path, short type, short major, short minor, enum inode_sub_type sub_type, int pid)
+{
+  struct inode *ip;
+
+  begin_op();
+  if((ip = create(path, type, major, minor, sub_type)) == 0){
+    end_op();
+    return 0;
+  }
+  ip->proc_pid = pid;
+  ip->ref++;
+  iunlockput(ip);
+  end_op();
   return ip;
 }
 
@@ -299,7 +327,7 @@ sys_open(void)
   begin_op();
 
   if(omode & O_CREATE){
-    ip = create(path, T_FILE, 0, 0);
+    ip = create(path, T_FILE, 0, 0, NONE);
     if(ip == 0){
       end_op();
       return -1;
@@ -342,7 +370,7 @@ sys_mkdir(void)
   struct inode *ip;
 
   begin_op();
-  if(argstr(0, &path) < 0 || (ip = create(path, T_DIR, 0, 0)) == 0){
+  if(argstr(0, &path) < 0 || (ip = create(path, T_DIR, 0, 0, NONE)) == 0){
     end_op();
     return -1;
   }
@@ -351,6 +379,8 @@ sys_mkdir(void)
   return 0;
 }
 
+
+
 int
 sys_mknod(void)
 {
@@ -358,15 +388,27 @@ sys_mknod(void)
   char *path;
   int len;
   int major, minor;
-  
+  short sub_type = NONE;
+ 
+
   begin_op();
-  if((len=argstr(0, &path)) < 0 ||
-     argint(1, &major) < 0 ||
-     argint(2, &minor) < 0 ||
-     (ip = create(path, T_DEV, major, minor)) == 0){
+  if((len=argstr(0, &path)) < 0 || argint(1, &major) < 0 || argint(2, &minor) < 0){
     end_op();
     return -1;
   }
+
+  if( major == PROCFS) sub_type = PROC_DIR;
+
+  if((ip = create(path, T_DEV, major, minor, sub_type)) == 0){
+    end_op();
+    return -1;
+  }
+
+  if( major == PROCFS){
+    ip->ref++;
+    cprintf("mknod proc sub_type: %d\n",ip->sub_type);
+  }
+
   iunlockput(ip);
   end_op();
   return 0;
