@@ -516,7 +516,7 @@ dirlookup(struct inode *dp, char *name, uint *poff)
   uint off, inum;
   struct dirent de;
   struct inode *ip;
-  cprintf("dirlookup for: %s\n",name);
+  // cprintf("dirlookup for: %s\n",name);
   if(dp->type != T_DIR && !IS_DEV_DIR(dp))
     panic("dirlookup not DIR");
 

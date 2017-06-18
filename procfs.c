@@ -42,26 +42,34 @@ procfsiread(struct inode* dp, struct inode *ip) {
 
 int
 procfsread(struct inode *ip, char *dst, int off, int n) {
-  // cprintf("--procfsread--\n");
-  if(ip->sub_type == PROC_DIR){
-    if(off + n > sizeof(proc_dir_dirents)) return 0; 
-    cprintf("offset: %d\n", off/sizeof(struct dirent));
-    memmove(dst, proc_dir_dirents + off, n);
-    return n;
-  }
-  return 0;
+  switch(ip->sub_type){
+
+    case PROC_DIR:
+      if(off + n > sizeof(proc_dir_dirents)) return 0; 
+      memmove(dst, (char*)proc_dir_dirents + off, n);
+      return n;
+      break;
+
+    default:
+      return 0;
+  }  
 }
 
 int
 procfswrite(struct inode *ip, char *buf, int n){
   // cprintf("--procfswrite--\n");
   int i;
-  if(ip->sub_type == PROC_DIR){
-    if((i=lookup_empty_cell())< 0) return 0;
-    memmove(&proc_dir_dirents[i], buf, n);
-    return n;
+  
+  switch(ip->sub_type){
+
+    case PROC_DIR:
+      if((i=lookup_empty_cell())< 0) return 0;
+      memmove(&proc_dir_dirents[i], buf, n);
+      return n;
+
+    default:
+      return 0;
   }
-  return 0;
 }
 
 void

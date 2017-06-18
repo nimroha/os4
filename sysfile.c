@@ -406,7 +406,7 @@ sys_mknod(void)
 
   if( major == PROCFS){
     ip->ref++;
-    cprintf("mknod proc sub_type: %d\n",ip->sub_type);
+    // cprintf("mknod proc sub_type: %d\n",ip->sub_type);
   }
 
   iunlockput(ip);
