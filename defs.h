@@ -53,7 +53,7 @@ void            stati(struct inode*, struct stat*);
 int             writei(struct inode*, char*, uint, uint);
 
 //sysfile.c
-struct inode*	icreate(char *path, short type, short major, short minor, enum inode_sub_type sub_type, int pid);
+// struct inode*	icreate(char *path, short type, short major, short minor, enum inode_sub_type sub_type, int pid);
 
 // ide.c
 void            ideinit(void);

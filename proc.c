@@ -8,6 +8,19 @@
 #include "spinlock.h"
 #include "stat.h"
 
+static uint proc_dir_inum;
+
+
+struct p_dirent* get_proc_dir_dirents(void);
+void init_proc_dirents(struct proc* p);
+int icreate(struct proc* p);
+void iremove(struct proc* p);
+
+void
+set_proc_dir_inum(int i)
+{
+  proc_dir_inum = i;
+}
 
 struct {
   struct spinlock lock;
@@ -21,7 +34,64 @@ extern void forkret(void);
 extern void trapret(void);
 // extern struct proc* lookup_proc_py_pid(int pid);
 static void wakeup1(void *chan);
-void init_proc_dirents(struct proc* p);
+
+
+int
+p_atoi(const char *s)
+{
+  int n;
+
+  n = 0;
+  while('0' <= *s && *s <= '9')
+    n = n*10 + *s++ - '0';
+  return n;
+}
+
+char*
+p_strcpy(char *s, char *t)
+{
+  char *os;
+
+  os = s;
+  while((*s++ = *t++) != 0)
+    ;
+  return os;
+}
+
+int
+p_strcmp(const char *p, const char *q)
+{
+  while(*p && *p == *q)
+    p++, q++;
+  return (uchar)*p - (uchar)*q;
+}
+
+void
+p_uitoa(char* dest, uint num)
+{
+  int i,n,m,exp;
+  n = 0;
+  exp = 1;
+  if (num == 0) {
+    dest[0]='0';
+    dest[1] = 0;
+  }
+
+  while ((num/exp) > 0){
+    n++;
+    exp *= 10;
+  }
+
+  m = num;
+  
+  for (i = 1; i < n + 1; i++){
+    dest[n - i] = m % 10 + '0';
+    m = m / 10;
+  }
+
+dest[n] = 0;
+}
+
 void
 pinit(void)
 {
@@ -101,7 +171,7 @@ userinit(void)
   safestrcpy(p->name, "initcode", sizeof(p->name));
   p->cwd = namei("/");
   init_proc_dirents(p);
-  // p->proc_inode = icreate("1" ,T_DEV, 2, 0, PROC, 1);
+  // p->proc_inode = icreate("proc/1" ,T_DEV, 2, 1, PROC, 1);
 
   p->state = RUNNABLE;
 }
@@ -164,7 +234,7 @@ fork(void)
   pid = np->pid;
   init_proc_dirents(np);
   path[5] += pid;
-  // np->proc_inode = icreate(path ,T_DEV, 2, 1, PROC, pid);
+  np->proc_inum = icreate(np);
   // lock to force the compiler to emit the np->state write last.
   acquire(&ptable.lock);
   np->state = RUNNABLE;
@@ -181,7 +251,6 @@ exit(void)
 {
   struct proc *p;
   int fd;
-
   if(proc == initproc)
     panic("init exiting");
 
@@ -211,6 +280,8 @@ exit(void)
         wakeup1(initproc);
     }
   }
+
+  iremove(proc);
 
   // Jump into the scheduler, never to return.
   proc->state = ZOMBIE;
@@ -485,6 +556,74 @@ lookup_proc_py_pid(int pid)
   return 0;
 }
 
+int
+lookup_empty_cell(struct p_dirent* dirents,int size){
+  int i;
+  for(i = 0; i < size; i++){
+      if(dirents[i].inum == 0)
+        break;
+    }
+    if(i == size) return -1;
+    return i;
+}
+
+void
+iremove(struct proc* p)
+{
+  int i, pid;
+  struct p_dirent* proc_dir_dirents;
+  char name[P_DIRSIZ];
+
+  pid = (int)(p->pid);
+  proc_dir_dirents = get_proc_dir_dirents();
+  p_uitoa(name, pid);
+  for(i = 0 ; i<DIRENTS_SIZE ;i++){
+    if(p_strcmp((proc_dir_dirents[i].name), name) == 0)
+      break;
+    
+  }
+  memset(&(proc_dir_dirents[i]),0 ,  sizeof(struct p_dirent));
+}
+
+int
+icreate(struct proc* p)
+{
+  int i, pid, p_inum;
+  char name[P_DIRSIZ];
+  struct p_dirent* proc_dir_dirents;
+
+  pid = (int)(p->pid);
+  proc_dir_dirents = get_proc_dir_dirents();
+  p_uitoa(name, pid);
+
+  if((i = lookup_empty_cell(proc_dir_dirents, DIRENTS_SIZE))<0)
+    panic("no space in proc_dir_dirents");
+
+  p_inum = 10000 + pid*10;
+
+  proc_dir_dirents[i].inum = p_inum;
+  p_strcpy((char*)(proc_dir_dirents[i].name),name);
+
+  //linking . and ..
+  // p->proc_dirents[0].inum = p_inum;
+  // p_strcpy((char*)( p->proc_dirents[1].name),".");
+
+  // p->proc_dirents[1].inum = proc_dir_inum;
+  // p_strcpy((char*)( p->proc_dirents[1].name),"..");
+
+  // //addinf files
+  // p->proc_dirents[2].inum = p_inum + 1;
+  // p_strcpy((char*)( p->proc_dirents[1].name),"cwd");
+
+  // p->proc_dirents[3].inum = p_inum + 2;
+  // p_strcpy((char*)( p->proc_dirents[1].name),"fdinfo");
+
+  // p->proc_dirents[4].inum = p_inum + 3;
+  // p_strcpy((char*)( p->proc_dirents[1].name),"status");
+
+  return p_inum;
+
+}
 
 void
 init_proc_dirents(struct proc* p)

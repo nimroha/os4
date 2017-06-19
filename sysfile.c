@@ -14,7 +14,7 @@
 #include "file.h"
 #include "fcntl.h"
 
-
+void set_proc_dir_inum(int i);
 // Fetch the nth word-sized system call argument as a file descriptor
 // and return both the descriptor and the corresponding struct file.
 static int
@@ -297,23 +297,24 @@ create(char *path, short type, short major, short minor, enum inode_sub_type sub
   return ip;
 }
 
-struct inode*
-icreate(char *path, short type, short major, short minor, enum inode_sub_type sub_type, int pid)
-{
-  struct inode *ip;
- // cprintf("icreate\n");//DEBUG
-  begin_op();
-  if((ip = create(path, T_DEV, major, minor, sub_type)) == 0){
-    end_op();
-    return 0;
-  }
-  if( major == PROCFS){
-    idup(ip);
-  }
-  iunlockput(ip);
-  end_op();
-  return ip;
-}
+// struct inode*
+// icreate(char *path, short type, short major, short minor, enum inode_sub_type sub_type, int pid)
+// {
+//   struct inode *ip;
+//  // cprintf("icreate\n");//DEBUG
+//   begin_op();
+//   if((ip = create(path, T_DEV, major, minor, sub_type)) == 0){
+//     end_op();
+//     return 0;
+//   }
+//   if( major == PROCFS){
+//     idup(ip);
+//     ip->proc_pid = pid;
+//   }
+//   iunlockput(ip);
+//   end_op();
+//   return ip;
+// }
 
 int
 sys_open(void)
@@ -408,6 +409,7 @@ sys_mknod(void)
 
   if( major == PROCFS){
     idup(ip);
+    set_proc_dir_inum(ip->inum);
   }
 
   iunlockput(ip);

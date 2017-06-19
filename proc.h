@@ -2,11 +2,13 @@
 #define NSEGS     7
 #define PROC_DIRENTS_SIZE 5
 #define P_DIRSIZ 14
+#define DIRENTS_SIZE NPROC + 4
 
 struct p_dirent {
   ushort inum;
   char name[P_DIRSIZ];
 };
+
 
 // Per-CPU state
 struct cpu {
@@ -73,8 +75,9 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
-  struct inode* proc_inode;
+  int proc_inum;
   struct p_dirent proc_dirents[PROC_DIRENTS_SIZE];
+
 };
 
 // Process memory is laid out contiguously, low addresses first:
