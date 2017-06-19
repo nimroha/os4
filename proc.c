@@ -605,11 +605,11 @@ icreate(struct proc* p)
   p_strcpy((char*)(proc_dir_dirents[i].name),name);
 
   //linking . and ..
-  // p->proc_dirents[0].inum = p_inum;
-  // p_strcpy((char*)( p->proc_dirents[1].name),".");
+  p->proc_dirents[0].inum = p_inum;
+  p_strcpy((char*)( p->proc_dirents[0].name),".");
 
-  // p->proc_dirents[1].inum = proc_dir_inum;
-  // p_strcpy((char*)( p->proc_dirents[1].name),"..");
+  p->proc_dirents[1].inum = proc_dir_inum;
+  p_strcpy((char*)( p->proc_dirents[1].name),"..");
 
   // //addinf files
   // p->proc_dirents[2].inum = p_inum + 1;

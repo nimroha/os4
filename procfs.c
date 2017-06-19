@@ -91,11 +91,12 @@ void
 proc_dir_set_inode_by_name(struct inode* ip, char* name)
 {
   int pid;
-  if(strcmp(name,"blockstat")){
+
+  if(strcmp(name,"blockstat") == 0){
     ip->proc_pid = 0;
     ip->sub_type = BLOCK_STAT;
     ip->size = sizeof(struct dirent);
-  }else if(strcmp(name,"inodestat")){
+  }else if(strcmp(name,"inodestat") == 0){
     ip->proc_pid = 0;
     ip->sub_type = INODE_STAT;
     ip->size = sizeof(struct dirent);
@@ -144,12 +145,12 @@ void
 proc_set_inode_by_name(int pid, struct inode* ip, char* name)
 {
   ip->proc_pid = pid;
-
-  if(strcmp(name,"cwd")){
+  // cprintf("iread name: %s", name);//DEBUG
+  if(strcmp(name,"cwd") == 0){
     ip->sub_type = CWD;
-  }else if(strcmp(name,"fdinfo")){
+  }else if(strcmp(name,"fdinfo") == 0){
     ip->sub_type = FD_INFO;
-  }else if(strcmp(name,"status")){
+  }else if(strcmp(name,"status") == 0){
     ip->sub_type = STATUS;
   }
   ip->size = sizeof(struct dirent);
@@ -164,20 +165,19 @@ procfsisdir(struct inode *ip) {
 void 
 procfsiread(struct inode* dp, struct inode *ip) {
   int i;
-  char *name;
-  // cprintf("--procfsiread--\n");
+  // cprintf("--procfsiread--\n");//DEBUG
 
   switch(dp->sub_type){
     case PROC_DIR:
+      // cprintf("procfsiread PROC_DIR\n");//DEBUG
       if((i = proc_dir_lookup_cell_by_inum(ip->inum)) < 0) panic("iread: dirent not in proc_dir");
-      name = proc_dir_dirents[i].name;
-      proc_dir_set_inode_by_name(ip, name);//sets ip's proc_pid ans sub_type
+      proc_dir_set_inode_by_name(ip, proc_dir_dirents[i].name);//sets ip's proc_pid ans sub_type
       break;
 
     case PROC:
+      // cprintf("procfsiread PROC\n");//DEBUG
       if((i = proc_lookup_cell_by_inum(dp->proc_pid, ip->inum)) < 0) panic("iread: dirent not in proc_dir");
-      name = proc_dir_dirents[i].name;
-      proc_set_inode_by_name(dp->proc_pid, ip, name);//sets ip's proc_pid ans sub_type
+      proc_set_inode_by_name(dp->proc_pid, ip, proc_dir_dirents[i].name);//sets ip's proc_pid ans sub_type
       break;
 
     default:
