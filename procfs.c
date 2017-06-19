@@ -58,10 +58,10 @@ strcpy(char *s, char *t)
 void
 proc_dir_add_files()
 {
- proc_dir_dirents[2].inum = 1000 + 2;
+  proc_dir_dirents[2].inum = 10000 + 2;
   strcpy((char*)( proc_dir_dirents[2].name),"blockstat");
 
-  proc_dir_dirents[3].inum = 1000 + 3;
+  proc_dir_dirents[3].inum = 10000 + 3;
   strcpy((char*)( proc_dir_dirents[3].name),"inodestat");
 }
 
@@ -144,16 +144,21 @@ proc_lookup_cell_by_inum(int pid, uint inum)
 void 
 proc_set_inode_by_name(int pid, struct inode* ip, char* name)
 {
+  // struct proc* p;
+  // p = lookup_proc_py_pid(pid);
+
   ip->proc_pid = pid;
+  ip->size = sizeof(struct dirent);
   // cprintf("iread name: %s", name);//DEBUG
   if(strcmp(name,"cwd") == 0){
     ip->sub_type = CWD;
+    // p->proc_dirents[3].inum =  cwd->inum;
   }else if(strcmp(name,"fdinfo") == 0){
     ip->sub_type = FD_INFO;
   }else if(strcmp(name,"status") == 0){
     ip->sub_type = STATUS;
   }
-  ip->size = sizeof(struct dirent);
+  
 }
 //--------------------------------------------------------------------------
 
@@ -166,6 +171,10 @@ void
 procfsiread(struct inode* dp, struct inode *ip) {
   int i;
   // cprintf("--procfsiread--\n");//DEBUG
+
+  ip->major = 2;
+  ip->type = T_DEV;
+  ip->flags = I_VALID;
 
   switch(dp->sub_type){
     case PROC_DIR:
@@ -183,9 +192,7 @@ procfsiread(struct inode* dp, struct inode *ip) {
     default:
       break;
   }
-  ip->major = 2;
-  ip->type = T_DEV;
-  ip->flags = I_VALID;
+
 }
 
 int
@@ -239,7 +246,7 @@ void
 procfsinit(void)
 {
   memset(&proc_dir_dirents, 0 ,sizeof(proc_dir_dirents));
-  // proc_dir_add_files();
+  proc_dir_add_files();
   devsw[PROCFS].isdir = procfsisdir;
   devsw[PROCFS].iread = procfsiread;
   devsw[PROCFS].write = procfswrite;

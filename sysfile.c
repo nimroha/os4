@@ -410,6 +410,7 @@ sys_mknod(void)
   if( major == PROCFS){
     idup(ip);
     set_proc_dir_inum(ip->inum);
+    ip->size = DIRENTS_SIZE * sizeof(struct dirent);
   }
 
   iunlockput(ip);
@@ -438,6 +439,8 @@ sys_chdir(void)
   iput(proc->cwd);
   end_op();
   proc->cwd = ip;
+  set_cwd(proc, ip->inum);
+
   return 0;
 }
 

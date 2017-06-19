@@ -121,6 +121,7 @@ void            userinit(void);
 int             wait(void);
 void            wakeup(void*);
 void            yield(void);
+void 	       set_cwd(struct proc* p, uint inum);
 
 // procfs.c
 void 			procfsinit(void);

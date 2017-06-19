@@ -611,18 +611,24 @@ icreate(struct proc* p)
   p->proc_dirents[1].inum = proc_dir_inum;
   p_strcpy((char*)( p->proc_dirents[1].name),"..");
 
-  // //addinf files
-  // p->proc_dirents[2].inum = p_inum + 1;
-  // p_strcpy((char*)( p->proc_dirents[1].name),"cwd");
+  //addinf files
+  p->proc_dirents[2].inum = (uint)(((struct p_inode*)p->cwd)->inum);
+  p_strcpy((char*)( p->proc_dirents[2].name),"cwd");
 
-  // p->proc_dirents[3].inum = p_inum + 2;
-  // p_strcpy((char*)( p->proc_dirents[1].name),"fdinfo");
+  p->proc_dirents[3].inum = p_inum + 2;
+  p_strcpy((char*)( p->proc_dirents[3].name),"fdinfo");
 
-  // p->proc_dirents[4].inum = p_inum + 3;
-  // p_strcpy((char*)( p->proc_dirents[1].name),"status");
+  p->proc_dirents[4].inum = p_inum + 3;
+  p_strcpy((char*)( p->proc_dirents[4].name),"status");
 
   return p_inum;
 
+}
+
+void
+set_cwd(struct proc* p, uint inum)
+{
+   p->proc_dirents[2].inum = inum;
 }
 
 void

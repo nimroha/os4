@@ -3,12 +3,28 @@
 #define PROC_DIRENTS_SIZE 5
 #define P_DIRSIZ 14
 #define DIRENTS_SIZE NPROC + 4
+#define P_NDIRECT 12
 
 struct p_dirent {
   ushort inum;
   char name[P_DIRSIZ];
 };
 
+struct p_inode {
+  uint dev;           // Device number
+  uint inum;          // Inode number
+  int ref;            // Reference count
+  int flags;          // I_BUSY, I_VALID
+
+  short type;         // copy of disk inode
+  short major;
+  short minor;
+  short nlink;
+  uint size;
+  uint addrs[P_NDIRECT+1];
+  uint proc_pid;    // -1 for regular inode, 0 for /proc, PID for /proc/proc->pid/
+  enum inode_sub_type sub_type;
+};
 
 // Per-CPU state
 struct cpu {

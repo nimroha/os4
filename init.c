@@ -14,9 +14,6 @@ main(void)
 
 
   mknod("proc", 2, 0);
-  // mknod("/proc/proc1", 2, 0);
-  // link("proc1","//proc//proc1");
-
 
   if(open("console", O_RDWR) < 0){
     mknod("console", 1, 1);
