@@ -8,6 +8,7 @@
 #include "spinlock.h"
 #include "stat.h"
 
+
 struct {
   struct spinlock lock;
   struct proc proc[NPROC];
@@ -18,9 +19,9 @@ static struct proc *initproc;
 int nextpid = 1;
 extern void forkret(void);
 extern void trapret(void);
-
+// extern struct proc* lookup_proc_py_pid(int pid);
 static void wakeup1(void *chan);
-
+void init_proc_dirents(struct proc* p);
 void
 pinit(void)
 {
@@ -99,7 +100,8 @@ userinit(void)
 
   safestrcpy(p->name, "initcode", sizeof(p->name));
   p->cwd = namei("/");
-  // p->proc_inode = icreate("proc/1" ,T_DEV, 2, 1, PROC, 1);
+  init_proc_dirents(p);
+  // p->proc_inode = icreate("1" ,T_DEV, 2, 0, PROC, 1);
 
   p->state = RUNNABLE;
 }
@@ -160,8 +162,9 @@ fork(void)
   safestrcpy(np->name, proc->name, sizeof(proc->name));
  
   pid = np->pid;
+  init_proc_dirents(np);
   path[5] += pid;
-  // np->proc_inode = icreate(path ,T_DEV, 2, 1, PROC, 1);
+  // np->proc_inode = icreate(path ,T_DEV, 2, 1, PROC, pid);
   // lock to force the compiler to emit the np->state write last.
   acquire(&ptable.lock);
   np->state = RUNNABLE;
@@ -242,6 +245,7 @@ wait(void)
         p->parent = 0;
         p->name[0] = 0;
         p->killed = 0;
+        init_proc_dirents(p);
         release(&ptable.lock);
         return pid;
       }
@@ -480,3 +484,11 @@ lookup_proc_py_pid(int pid)
   }
   return 0;
 }
+
+
+void
+init_proc_dirents(struct proc* p)
+{
+  memset(&(p->proc_dirents),0 ,sizeof(p->proc_dirents)); 
+}
+

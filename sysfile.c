@@ -242,16 +242,16 @@ create(char *path, short type, short major, short minor, enum inode_sub_type sub
   uint off;
   struct inode *ip, *dp;
   char name[DIRSIZ];
+  // cprintf("create\n");//DEBUG
 
   if((dp = nameiparent(path, name)) == 0)
     return 0;
-  ilock(dp);
 
+  ilock(dp);
   if (dp->type == T_DEV && (dp->sub_type != PROC_DIR || dp->sub_type != PROC)) {
     iunlockput(dp);
     return 0;
   }
-
   if((ip = dirlookup(dp, name, &off)) != 0){
     iunlockput(dp);
     ilock(ip);
@@ -281,6 +281,7 @@ create(char *path, short type, short major, short minor, enum inode_sub_type sub
   }
 
   if( IS_DEV_DIR(ip)){  // Create . and .. entries.
+    // cprintf("linking..\n");//DEBUG
     dp->nlink++;  // for ".."
     iupdate(dp);
     // No ip->nlink++ for ".": avoid cyclic ref count.
@@ -300,14 +301,15 @@ struct inode*
 icreate(char *path, short type, short major, short minor, enum inode_sub_type sub_type, int pid)
 {
   struct inode *ip;
-
+ // cprintf("icreate\n");//DEBUG
   begin_op();
-  if((ip = create(path, type, major, minor, sub_type)) == 0){
+  if((ip = create(path, T_DEV, major, minor, sub_type)) == 0){
     end_op();
     return 0;
   }
-  ip->proc_pid = pid;
-  ip->ref++;
+  if( major == PROCFS){
+    idup(ip);
+  }
   iunlockput(ip);
   end_op();
   return ip;
@@ -405,8 +407,7 @@ sys_mknod(void)
   }
 
   if( major == PROCFS){
-    ip->ref++;
-    // cprintf("mknod proc sub_type: %d\n",ip->sub_type);
+    idup(ip);
   }
 
   iunlockput(ip);

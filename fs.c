@@ -248,8 +248,7 @@ iget(uint dev, uint inum)
   ip->ref = 1;
   ip->flags = 0;
   ip->proc_pid = -1;
-  // cprintf("iget change sub_type: %d\n", ip->sub_type);
-  // ip->sub_type = NONE;
+  ip->sub_type = NONE;
   release(&icache.lock);
 
   return ip;
@@ -260,9 +259,11 @@ iget(uint dev, uint inum)
 struct inode*
 idup(struct inode *ip)
 {
+  // cprintf("idup \n");//DEBUG
   acquire(&icache.lock);
   ip->ref++;
   release(&icache.lock);
+  // cprintf("idup end \n");//DEBUG
   return ip;
 }
 
@@ -552,11 +553,11 @@ dirlink(struct inode *dp, char *name, uint inum)
   int off;
   struct dirent de;
   struct inode *ip;
-
+  // cprintf("linking..%s\n",name);//DEBUG
   // Check that name is not present.
   if((ip = dirlookup(dp, name, 0)) != 0){
     iput(ip);
-    cprintf("dirlookup none 0\n");
+    // cprintf("dirlookup none 0\n");
     return -1;
   }
 
@@ -625,11 +626,14 @@ static struct inode*
 namex(char *path, int nameiparent, char *name)
 {
   struct inode *ip, *next;
+  // cprintf("namex of %s parent? %d\n", path,nameiparent);//DEBUG
 
-  if(*path == '/')
+  if(*path == '/'){
     ip = iget(ROOTDEV, ROOTINO);
-  else
+  }
+  else{
     ip = idup(proc->cwd);
+  }
 
   while((path = skipelem(path, name)) != 0){
     ilock(ip);
