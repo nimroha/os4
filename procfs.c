@@ -163,30 +163,6 @@ strcpy(char *s, char *t)
   return os;
 }
 
-void
-uitoa(char* dest, uint num)
-{
-  int i,n,m,exp;
-  n = 0;
-  exp = 1;
-  if (num == 0) {
-    dest[0]='0';
-    dest[1] = 0;
-    return;
-  }
-
-  while ((num/exp) > 0){
-    n++;
-    exp *= 10;
-  }
-
-  m = num;
-  
-  for (i = 1; i < n + 1; i++){
-    dest[n - i] = m % 10 + '0';
-    m = m / 10;
-  }
-}
 
 //--------------------------------------------------------------------------
 //------------------------proc_dir functions----------------------------
@@ -447,13 +423,10 @@ procfsread(struct inode *ip, char *dst, int off, int n) {
     case STATUS:
       if( (off + n) > BUFF_SIZE) return 0; 
       p =  lookup_proc_py_pid(ip->proc_pid);
-
       status_to_str(status, p->state);
       len = strlen(status);
       memmove(dst,status,len);
-
       offset = len;
-
       size_to_str(size, p->sz);
       len = strlen(size);
       memmove(dst + offset ,size,len);
@@ -465,9 +438,6 @@ procfsread(struct inode *ip, char *dst, int off, int n) {
       p = lookup_proc_py_pid(ip->proc_pid);
       if(off + n > sizeof(p->fdinfo_dirents)) return 0; 
       memmove(dst, (char*)(p->fdinfo_dirents) + off, n);
-      
-      
-     
       return n;
       break;
 
