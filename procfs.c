@@ -10,6 +10,7 @@
 #include "mmu.h"
 #include "proc.h"
 #include "x86.h"
+#define BUFF_SIZE 512
 
 struct proc* lookup_proc_py_pid(int pid);
 int proc_dir_lookup_empty_cell(void);
@@ -51,6 +52,31 @@ strcpy(char *s, char *t)
   while((*s++ = *t++) != 0)
     ;
   return os;
+}
+
+void
+uitoa(char* dest, uint num)
+{
+  int i,n,m,exp;
+  n = 0;
+  exp = 1;
+  if (num == 0) {
+    dest[0]='0';
+    dest[1] = 0;
+    return;
+  }
+
+  while ((num/exp) > 0){
+    n++;
+    exp *= 10;
+  }
+
+  m = num;
+  
+  for (i = 1; i < n + 1; i++){
+    dest[n - i] = m % 10 + '0';
+    m = m / 10;
+  }
 }
 
 //--------------------------------------------------------------------------
@@ -109,6 +135,32 @@ proc_dir_set_inode_by_name(struct inode* ip, char* name)
 }
 //--------------------------------------------------------------------------
 //------------------------proc functions--------------------------------
+void
+status_to_str(char* dest, enum procstate state)
+{
+  char *states[] = {
+  [UNUSED]    "Status: UNUSED,   ",
+  [EMBRYO]    "Status: EMBRYO,   ",
+  [SLEEPING]  "Status: SLEEPING,   ",
+  [RUNNABLE]  "Status: RUNNABLE,   ",
+  [RUNNING]   "Status: RUNNING,   ",
+  [ZOMBIE]    "Status: ZOMBIE,   "
+  };
+  strcpy(dest, states[state] );
+}
+
+void
+size_to_str(char* dest, uint sz)
+{ 
+  int off;
+  char size[]="Size: ";
+  off = strlen(size);
+  strcpy(dest, size);
+  uitoa((char*)(dest + off),  sz);
+  off = strlen(dest);
+  dest[off-1] = 10;
+  dest[off] = 0;
+}
 
 int 
 proc_lookup_empty_cell(int pid)
@@ -146,13 +198,11 @@ proc_set_inode_by_name(int pid, struct inode* ip, char* name)
 {
   // struct proc* p;
   // p = lookup_proc_py_pid(pid);
-
   ip->proc_pid = pid;
   ip->size = sizeof(struct dirent);
-  // cprintf("iread name: %s", name);//DEBUG
+  // cprintf("proc-> name: %s\n", name);//DEBUG
   if(strcmp(name,"cwd") == 0){
     ip->sub_type = CWD;
-    // p->proc_dirents[3].inum =  cwd->inum;
   }else if(strcmp(name,"fdinfo") == 0){
     ip->sub_type = FD_INFO;
   }else if(strcmp(name,"status") == 0){
@@ -170,6 +220,7 @@ procfsisdir(struct inode *ip) {
 void 
 procfsiread(struct inode* dp, struct inode *ip) {
   int i;
+  struct proc* p;
   // cprintf("--procfsiread--\n");//DEBUG
 
   ip->major = 2;
@@ -185,8 +236,9 @@ procfsiread(struct inode* dp, struct inode *ip) {
 
     case PROC:
       // cprintf("procfsiread PROC\n");//DEBUG
+      p =  lookup_proc_py_pid(dp->proc_pid);
       if((i = proc_lookup_cell_by_inum(dp->proc_pid, ip->inum)) < 0) panic("iread: dirent not in proc_dir");
-      proc_set_inode_by_name(dp->proc_pid, ip, proc_dir_dirents[i].name);//sets ip's proc_pid ans sub_type
+      proc_set_inode_by_name(dp->proc_pid, ip,p->proc_dirents[i].name);//sets ip's proc_pid ans sub_type
       break;
 
     default:
@@ -198,6 +250,9 @@ procfsiread(struct inode* dp, struct inode *ip) {
 int
 procfsread(struct inode *ip, char *dst, int off, int n) {
   struct proc* p;
+  char status[25];
+  char size[25];
+  int len , offset;
 
   switch(ip->sub_type){
 
@@ -214,9 +269,26 @@ procfsread(struct inode *ip, char *dst, int off, int n) {
       return n;
       break;
 
+    case STATUS:
+      if( (off + n) > BUFF_SIZE) return 0; 
+      p =  lookup_proc_py_pid(ip->proc_pid);
+
+      status_to_str(status, p->state);
+      len = strlen(status);
+      memmove(dst,status,len);
+
+      offset = len;
+
+      size_to_str(size, p->sz);
+      len = strlen(size);
+      memmove(dst + offset ,size,len);
+      return offset + len;
+      break;
+
     default:
       return 0;
   }  
+
 }
 
 int
