@@ -13,41 +13,90 @@
 #define BUFF_SIZE 512
 
 #define MAX_STAT_BUF_SIZE 2048
+#define MAX_FDINFO_BUF_SIZE 1024
 
 struct proc* lookup_proc_py_pid(int pid);
 int proc_dir_lookup_empty_cell(void);
 void inode_stats_to_buf(struct p_inode_stats*);
 void block_stats_to_buf(struct p_block_stats*);
+void fd_info_to_buf(int fd,struct file *f);
 
 static struct p_dirent proc_dir_dirents[DIRENTS_SIZE];
 static struct p_block_stats block_stats = {0};
 static struct p_inode_stats inode_stats = {0};
 static char   inode_stats_buff[MAX_STAT_BUF_SIZE];
 static char   block_stats_buff[MAX_STAT_BUF_SIZE];
+static char   fd_info_buff[MAX_FDINFO_BUF_SIZE];
 static int    inode_buf_length;
 static int    block_buf_length;
+static int    fd_info_buf_length;
 
+int
+cat_fdinfo_file(char *dst, int off, int n, int fd, struct file *f){
 
-void
+  if(off == 0){
+    cprintf("cat_fdinfo_file: fetching data\n");//DEBUG
+    fd_info_to_buf(fd,f);
+  }
+
+  if(off+n > fd_info_buf_length){
+    n = fd_info_buf_length - off;
+    if(n > 0){
+      memmove(dst + off,fd_info_buff + off,n);
+    }else{
+      n = 0;
+    }
+  }else{
+    memmove(dst + off,fd_info_buff + off,n);  
+  }
+
+  return n;
+}
+
+int
 cat_inode_stats(char *dst, int off, int n){
 
   if(off == 0){
+    cprintf("cat_inode_stats: fetching data\n");//DEBUG
     get_inode_stats(&inode_stats);
     inode_stats_to_buf(&inode_stats);
   }
 
-  memmove(dst + off,inode_stats_buff + off,n);
+  if(off+n > inode_buf_length){
+    n = inode_buf_length - off;
+    if(n > 0){
+      memmove(dst + off,inode_stats_buff + off,n);
+    }else{
+      n = 0;
+    }
+  }else{
+    memmove(dst + off,inode_stats_buff + off,n);  
+  }
+
+  return n;
 }
 
-void
+int
 cat_block_stats(char *dst, int off, int n){
 
   if(off == 0){
+    cprintf("cat_block_stats: fetching data\n");//DEBUG
     get_block_stats(&block_stats);
     block_stats_to_buf(&block_stats);
   }
 
-  memmove(dst + off,block_stats_buff + off,n);
+  if(off+n > block_buf_length){
+    n = block_buf_length - off;
+    if(n > 0){
+      memmove(dst + off,block_stats_buff + off,n);
+    }else{
+      n = 0;
+    }
+  }else{
+    memmove(dst + off,block_stats_buff + off,n);  
+  }
+
+  return n;
 }
 
 struct p_dirent*
@@ -260,27 +309,80 @@ proc_set_inode_by_name(int pid, struct inode* ip, char* name)
   // p = lookup_proc_py_pid(pid);
   ip->proc_pid = pid;
   ip->size = sizeof(struct dirent);
-  // cprintf("proc-> name: %s\n", name);//DEBUG
+  // cprintf("iread name: %s\n", name);//DEBUG
   if(strcmp(name,"cwd") == 0){
     ip->sub_type = CWD;
   }else if(strcmp(name,"fdinfo") == 0){
+    // cprintf("iread name: in %s\n", name);//DEBUG
     ip->sub_type = FD_INFO;
   }else if(strcmp(name,"status") == 0){
     ip->sub_type = STATUS;
   }
   
 }
+
+//--------------------------------------------------------------------------
+//------------------------fdinfo functions----------------------------------
+
+
+void
+fdinfo_set_inode_by_name(struct inode* ip, char* name)
+{
+  int fd;
+
+  fd = atoi(name);
+  ip->proc_fd = fd;
+  ip->sub_type = FD;
+  ip->size = MAX_FDINFO_BUF_SIZE;
+}
+
+
+
+
+int 
+fdinfo_lookup_empty_cell(int pid)
+{
+  int i;
+  struct proc* p;
+
+  p = lookup_proc_py_pid(pid);
+
+  for(i = 0; i < FDINFO_DIRENTS_SIZE; i++){
+      if(p->fdinfo_dirents[i].inum == 0)
+        break;
+    }
+    if(i == FDINFO_DIRENTS_SIZE) return -1;
+    return i;
+}
+
+int 
+fdinfo_lookup_cell_by_inum(int pid, uint inum)
+{
+  int i;
+  struct proc* p;
+
+  p = lookup_proc_py_pid(pid);
+
+  for(i = 0; i < FDINFO_DIRENTS_SIZE; i++){
+    if(p->fdinfo_dirents[i].inum == inum)
+      break;
+  }
+  if(i == FDINFO_DIRENTS_SIZE) return -1;
+  return i;
+}
+
+
 //--------------------------------------------------------------------------
 
 int 
 procfsisdir(struct inode *ip) {
-  return (ip->sub_type == PROC_DIR || ip->sub_type == PROC || ip->minor == 1);
+  return (ip->sub_type == PROC_DIR || ip->sub_type == PROC || ip->sub_type == FD_INFO);
 }
 
 void 
 procfsiread(struct inode* dp, struct inode *ip) {
   int i;
-  struct proc* p;
+  struct proc *p;
   // cprintf("--procfsiread--\n");//DEBUG
 
   ip->major = 2;
@@ -298,10 +400,19 @@ procfsiread(struct inode* dp, struct inode *ip) {
       // cprintf("procfsiread PROC\n");//DEBUG
       p =  lookup_proc_py_pid(dp->proc_pid);
       if((i = proc_lookup_cell_by_inum(dp->proc_pid, ip->inum)) < 0) panic("iread: dirent not in proc_dir");
-      proc_set_inode_by_name(dp->proc_pid, ip,p->proc_dirents[i].name);//sets ip's proc_pid ans sub_type
+      proc_set_inode_by_name(dp->proc_pid, ip, p->proc_dirents[i].name);//sets ip's proc_pid ans sub_type
+      break;
+
+    case FD_INFO:
+      // cprintf("--procfsiread FD_INFO--\n");//DEBUG
+      p =  lookup_proc_py_pid(dp->proc_pid);
+      if((i = fdinfo_lookup_cell_by_inum(dp->proc_pid,ip->inum)) < 0) panic("iread: dirent not in fdinfo");
+      fdinfo_set_inode_by_name(ip, p->fdinfo_dirents[i].name);
+      ip->proc_pid = dp->proc_pid;
       break;
 
     default:
+      panic("procfsiread: unknown sub_type");
       break;
   }
 
@@ -313,17 +424,21 @@ procfsread(struct inode *ip, char *dst, int off, int n) {
   char status[25];
   char size[25];
   int len , offset;
+  int fd;
+  struct file *f;
 
   switch(ip->sub_type){
 
     case PROC_DIR:
+      //cprintf("procfsread: PROC_DIR - off=%d size=%d\n",off,n);//DEBUG
       if(off + n > sizeof(proc_dir_dirents)) return 0; 
       memmove(dst, (char*)proc_dir_dirents + off, n);
       return n;
       break;
 
     case PROC:
-      p =  lookup_proc_py_pid(ip->proc_pid);
+      //cprintf("procfsread: PROC - off=%d size=%d\n",off,n);//DEBUG
+      p = lookup_proc_py_pid(ip->proc_pid);
       if(off + n > sizeof(p->proc_dirents)) return 0; 
       memmove(dst, (char*)(p->proc_dirents) + off, n);
       return n;
@@ -345,20 +460,40 @@ procfsread(struct inode *ip, char *dst, int off, int n) {
       return offset + len;
       break;
 
+    case FD_INFO:
+      //cprintf("procfsread: FD_INFO - off=%d size=%d\n",off,n);//DEBUG
+      p = lookup_proc_py_pid(ip->proc_pid);
+      if(off + n > sizeof(p->fdinfo_dirents)) return 0; 
+      memmove(dst, (char*)(p->fdinfo_dirents) + off, n);
       
+      
+     
+      return n;
+      break;
+
+    case FD:
+      //cprintf("procfsread: FD - off=%d size=%d\n",off,n);//DEBUG
+      p = lookup_proc_py_pid(ip->proc_pid);
+      fd = ip->proc_fd;
+      f = p->ofile[fd];
+      if(off + n > MAX_FDINFO_BUF_SIZE) return 0;
+      return cat_fdinfo_file(dst,off,n,fd,f);
+      break;
+
     case BLOCK_STAT:
-    if(off > block_buf_length) return 0;
-    cat_block_stats(dst,off,n);
-    return n;
-    break;
+      //cprintf("procfsread: BLOCK_STAT - off=%d size=%d\n",off,n);//DEBUG
+      if(off + n > MAX_STAT_BUF_SIZE) return 0;
+      return cat_block_stats(dst,off,n);
+      break;
 
     case INODE_STAT:
-    if(off > inode_buf_length) return 0;
-    cat_inode_stats(dst,off,n);
-    return n;
-    break;
+      //cprintf("procfsread: INODE_STAT - off=%d size=%d\n",off,n);//DEBUG
+      if(off + n > MAX_STAT_BUF_SIZE) return 0;
+      return cat_inode_stats(dst,off,n);
+      break;
 
     default:
+      panic("procfsread: unknown inode sub_type");
       return 0;
   }  
 
@@ -501,5 +636,89 @@ void block_stats_to_buf(struct p_block_stats* stats){
   block_stats_buff[off] = 0;
 
   block_buf_length = off;
+
+}
+
+void fd_info_to_buf(int fd,struct file *f){
+  int off = 0;
+  char *name_s="name: ";
+  char *type_s="type: ";
+  char *pos_s="position: ";
+  char *flags_s="flags: ";
+  char *inum_s="inode number: ";
+  char *ref_s="refs: ";
+  char *read="READ ";
+  char *write="WRITE";
+  char *nline="\n";
+  char *flag;
+  char *types[3] = { "FD_NONE", "FD_PIPE", "FD_INODE" };
+  char name_n[100] = {0};
+  char pos_n[100] = {0};
+  char inum_n[100] = {0};
+  char ref_n[100] = {0};
+
+
+  memset(fd_info_buff,0,MAX_FDINFO_BUF_SIZE);
+
+  //name
+  strcpy(fd_info_buff + off,name_s);
+  off += strlen(name_s);
+  uitoa(name_n,fd);
+  strcpy(fd_info_buff + off,name_n);
+  off += strlen(name_n);
+  strcpy(fd_info_buff + off,nline);
+  off += strlen(nline);
+
+  //type
+  strcpy(fd_info_buff + off,type_s);
+  off += strlen(type_s);
+  strcpy(fd_info_buff + off,types[f->type]);
+  off += strlen(types[f->type]);
+  strcpy(fd_info_buff + off,nline);
+  off += strlen(nline);
+
+  //pos
+  strcpy(fd_info_buff + off,pos_s);
+  off += strlen(pos_s);
+  uitoa(pos_n,f->off);
+  strcpy(fd_info_buff + off,pos_n);
+  off += strlen(pos_n);
+  strcpy(fd_info_buff + off,nline);
+  off += strlen(nline);
+
+  //flags
+  strcpy(fd_info_buff + off,flags_s);
+  off += strlen(flags_s);
+  flag = f->readable? read : "";
+  strcpy(fd_info_buff + off,flag);
+  off += strlen(flag);
+  flag = f->writable? write : "";
+  strcpy(fd_info_buff + off,flag);
+  off += strlen(flag);
+  strcpy(fd_info_buff + off,nline);
+  off += strlen(nline);
+
+  //inum
+  strcpy(fd_info_buff + off,inum_s);
+  off += strlen(inum_s);
+  uitoa(inum_n,f->ip->inum);
+  strcpy(fd_info_buff + off,inum_n);
+  off += strlen(inum_n);
+  strcpy(fd_info_buff + off,nline);
+  off += strlen(nline);
+
+  //refs
+  strcpy(fd_info_buff + off,ref_s);
+  off += strlen(ref_s);
+  uitoa(ref_n,f->ref);
+  strcpy(fd_info_buff + off,ref_n);
+  off += strlen(ref_n);
+  strcpy(fd_info_buff + off,nline);
+  off += strlen(nline);
+
+
+  fd_info_buff[off] = 0;
+
+  fd_info_buf_length = off;
 
 }

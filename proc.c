@@ -13,6 +13,7 @@ static uint proc_dir_inum;
 
 struct p_dirent* get_proc_dir_dirents(void);
 void init_proc_dirents(struct proc* p);
+void init_fdinfo_dirents(struct proc* p);
 int icreate(struct proc* p);
 void iremove(struct proc* p);
 
@@ -75,6 +76,7 @@ p_uitoa(char* dest, uint num)
   if (num == 0) {
     dest[0]='0';
     dest[1] = 0;
+    return;
   }
 
   while ((num/exp) > 0){
@@ -91,6 +93,16 @@ p_uitoa(char* dest, uint num)
 
 dest[n] = 0;
 }
+
+#if 0
+void copy_fdinfo_dirents(struct p_dirent *src,struct p_dirent *dst){
+  int i;
+
+  for(i=2 ; i<FDINFO_DIRENTS_SIZE ; i++){
+    memmove(&src[i],&dst[i],sizeof(struct p_dirent));
+  }
+}
+#endif
 
 void
 pinit(void)
@@ -171,6 +183,7 @@ userinit(void)
   safestrcpy(p->name, "initcode", sizeof(p->name));
   p->cwd = namei("/");
   init_proc_dirents(p);
+  init_fdinfo_dirents(p);
   // p->proc_inode = icreate("proc/1" ,T_DEV, 2, 1, PROC, 1);
 
   p->state = RUNNABLE;
@@ -233,8 +246,10 @@ fork(void)
  
   pid = np->pid;
   init_proc_dirents(np);
+  init_fdinfo_dirents(np);
   path[5] += pid;
   np->proc_inum = icreate(np);
+  //copy_fdinfo_dirents(proc->fdinfo_dirents,np->fdinfo_dirents);
   // lock to force the compiler to emit the np->state write last.
   acquire(&ptable.lock);
   np->state = RUNNABLE;
@@ -317,6 +332,7 @@ wait(void)
         p->name[0] = 0;
         p->killed = 0;
         init_proc_dirents(p);
+        init_fdinfo_dirents(p);
         release(&ptable.lock);
         return pid;
       }
@@ -567,6 +583,9 @@ lookup_empty_cell(struct p_dirent* dirents,int size){
     return i;
 }
 
+
+
+
 void
 iremove(struct proc* p)
 {
@@ -599,7 +618,7 @@ icreate(struct proc* p)
   if((i = lookup_empty_cell(proc_dir_dirents, DIRENTS_SIZE))<0)
     panic("no space in proc_dir_dirents");
 
-  p_inum = 10000 + pid*10;
+  p_inum = 10000 + pid*100;
 
   proc_dir_dirents[i].inum = p_inum;
   p_strcpy((char*)(proc_dir_dirents[i].name),name);
@@ -611,7 +630,7 @@ icreate(struct proc* p)
   p->proc_dirents[1].inum = proc_dir_inum;
   p_strcpy((char*)( p->proc_dirents[1].name),"..");
 
-  //addinf files
+  //add files
   p->proc_dirents[2].inum = (uint)(((struct p_inode*)p->cwd)->inum);
   p_strcpy((char*)( p->proc_dirents[2].name),"cwd");
 
@@ -621,8 +640,53 @@ icreate(struct proc* p)
   p->proc_dirents[4].inum = p_inum + 3;
   p_strcpy((char*)( p->proc_dirents[4].name),"status");
 
+  //fd_info
+  p->fdinfo_dirents[0].inum = p_inum + 2;
+  p_strcpy((char*)( p->fdinfo_dirents[0].name),".");
+
+  p->fdinfo_dirents[1].inum = p_inum;
+  p_strcpy((char*)( p->fdinfo_dirents[1].name),"..");
+
+  for(i=0 ; i<NOFILE ; i++){
+    if(p->ofile[i] != 0){
+      memset(name,0,P_DIRSIZ);
+      p_uitoa(name,i);
+      p->fdinfo_dirents[i+2].inum = p_inum + (i+2)*10;
+      p_strcpy((char*)( p->fdinfo_dirents[i+2].name),name);
+    }
+  }
+
   return p_inum;
 
+}
+
+void
+add_file_to_fileinfo(struct proc* p,uint inum, int fd)
+{
+  int i;
+  char name[P_DIRSIZ];
+
+  p_uitoa(name, fd);
+
+  if( (i = lookup_empty_cell(p->fdinfo_dirents,FDINFO_DIRENTS_SIZE))<0) panic("no emty cell in fd_info");
+
+  p->fdinfo_dirents[i].inum = inum;
+  p_strcpy((char*)( p->fdinfo_dirents[i].name),name);
+}
+
+void
+remove_file_to_fileinfo(struct proc* p, int fd)
+{
+  int i;
+  char name[P_DIRSIZ];
+  p_uitoa(name, fd);
+
+  for(i = 0; i < FDINFO_DIRENTS_SIZE; i++){
+      if(p_strcmp( p->fdinfo_dirents[i].name, name) == 0)
+        break;
+    }
+
+  memset(&(p->fdinfo_dirents[i]),0 ,sizeof(struct p_dirent));
 }
 
 void
@@ -636,4 +700,12 @@ init_proc_dirents(struct proc* p)
 {
   memset(&(p->proc_dirents),0 ,sizeof(p->proc_dirents)); 
 }
+
+void
+init_fdinfo_dirents(struct proc* p)
+{
+  memset(&(p->fdinfo_dirents),0 ,sizeof(p->fdinfo_dirents)); 
+}
+
+
 

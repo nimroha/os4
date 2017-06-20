@@ -23,6 +23,7 @@ struct inode {
   uint size;
   uint addrs[NDIRECT+1];
   uint proc_pid;    // -1 for regular inode, 0 for /proc, PID for /proc/proc->pid/
+  uint proc_fd;     // -1 for regular inode, FD for /proc/fdinfo/fd
   enum inode_sub_type sub_type;
 };
 #define I_BUSY 0x1

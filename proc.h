@@ -1,8 +1,9 @@
 // Segments in proc->gdt.
 #define NSEGS     7
 #define PROC_DIRENTS_SIZE 5
+#define FDINFO_DIRENTS_SIZE (NOFILE+2) //+2 for . ..
 #define P_DIRSIZ 14
-#define DIRENTS_SIZE NPROC + 4
+#define DIRENTS_SIZE (NPROC + 4)
 #define P_NDIRECT 12
 
 struct p_dirent {
@@ -25,6 +26,7 @@ struct p_inode {
   uint proc_pid;    // -1 for regular inode, 0 for /proc, PID for /proc/proc->pid/
   enum inode_sub_type sub_type;
 };
+
 
 // Per-CPU state
 struct cpu {
@@ -93,6 +95,7 @@ struct proc {
   char name[16];               // Process name (debugging)
   int proc_inum;
   struct p_dirent proc_dirents[PROC_DIRENTS_SIZE];
+  struct p_dirent fdinfo_dirents[FDINFO_DIRENTS_SIZE];
 
 };
 
@@ -101,3 +104,9 @@ struct proc {
 //   original data and bss
 //   fixed-size stack
 //   expandable heap
+
+
+
+void add_file_to_fileinfo(struct proc* p,uint inum, int fd);
+
+void remove_file_to_fileinfo(struct proc* p, int fd);
