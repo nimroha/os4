@@ -12,10 +12,43 @@
 #include "x86.h"
 #define BUFF_SIZE 512
 
+#define MAX_STAT_BUF_SIZE 2048
+
 struct proc* lookup_proc_py_pid(int pid);
 int proc_dir_lookup_empty_cell(void);
+void inode_stats_to_buf(struct p_inode_stats*);
+void block_stats_to_buf(struct p_block_stats*);
 
 static struct p_dirent proc_dir_dirents[DIRENTS_SIZE];
+static struct p_block_stats block_stats = {0};
+static struct p_inode_stats inode_stats = {0};
+static char   inode_stats_buff[MAX_STAT_BUF_SIZE];
+static char   block_stats_buff[MAX_STAT_BUF_SIZE];
+static int    inode_buf_length;
+static int    block_buf_length;
+
+
+void
+cat_inode_stats(char *dst, int off, int n){
+
+  if(off == 0){
+    get_inode_stats(&inode_stats);
+    inode_stats_to_buf(&inode_stats);
+  }
+
+  memmove(dst + off,inode_stats_buff + off,n);
+}
+
+void
+cat_block_stats(char *dst, int off, int n){
+
+  if(off == 0){
+    get_block_stats(&block_stats);
+    block_stats_to_buf(&block_stats);
+  }
+
+  memmove(dst + off,block_stats_buff + off,n);
+}
 
 struct p_dirent*
 get_proc_dir_dirents(void)
@@ -33,6 +66,33 @@ atoi(const char *s)
   while('0' <= *s && *s <= '9')
     n = n*10 + *s++ - '0';
   return n;
+}
+
+void
+uitoa(char* dest, uint num)
+{
+  int i,n,m,exp;
+  n = 0;
+  exp = 1;
+  if (num == 0) {
+    dest[0]='0';
+    dest[1] = 0;
+    return;
+  }
+
+  while ((num/exp) > 0){
+    n++;
+    exp *= 10;
+  }
+
+  m = num;
+  
+  for (i = 1; i < n + 1; i++){
+    dest[n - i] = m % 10 + '0';
+    m = m / 10;
+  }
+
+dest[n] = 0;
 }
 
 int
@@ -285,6 +345,19 @@ procfsread(struct inode *ip, char *dst, int off, int n) {
       return offset + len;
       break;
 
+      
+    case BLOCK_STAT:
+    if(off > block_buf_length) return 0;
+    cat_block_stats(dst,off,n);
+    return n;
+    break;
+
+    case INODE_STAT:
+    if(off > inode_buf_length) return 0;
+    cat_inode_stats(dst,off,n);
+    return n;
+    break;
+
     default:
       return 0;
   }  
@@ -323,4 +396,110 @@ procfsinit(void)
   devsw[PROCFS].iread = procfsiread;
   devsw[PROCFS].write = procfswrite;
   devsw[PROCFS].read = procfsread;
+}
+
+void inode_stats_to_buf(struct p_inode_stats* stats){
+  int off=0;
+  int ratio;
+  char *free_s="free inodes: ";
+  char *valid_s="valid inodes: ";
+  char *ratio_s="refs per inode: ";
+  char *undef="undefined";
+  char *nline="\n";
+  char free_n[100] = {0};
+  char valid_n[100] = {0};
+  char ratio_n[100] = {0};
+
+  if(stats->total_used != 0){
+    ratio = stats->total_refs / stats->total_used;
+    uitoa(ratio_n,ratio);
+  }else{
+    strcpy(ratio_n, undef);
+  }
+
+  memset(inode_stats_buff,0,MAX_STAT_BUF_SIZE);
+
+  //free
+  strcpy(inode_stats_buff + off,free_s);
+  off += strlen(free_s);
+  uitoa(free_n,stats->free_inodes);
+  strcpy(inode_stats_buff + off,free_n);
+  off += strlen(free_n);
+  strcpy(inode_stats_buff + off,nline);
+  off += strlen(nline);
+
+  //valid
+  strcpy(inode_stats_buff + off,valid_s);
+  off += strlen(valid_s);
+  uitoa(valid_n,stats->free_inodes);
+  strcpy(inode_stats_buff + off,valid_n);
+  off += strlen(valid_n);
+  strcpy(inode_stats_buff + off,nline);
+  off += strlen(nline);
+
+  //ratio
+  strcpy(inode_stats_buff + off,ratio_s);
+  off += strlen(ratio_s);
+  strcpy(inode_stats_buff + off,ratio_n);
+  off += strlen(ratio_n);
+  strcpy(inode_stats_buff + off,nline);
+  off += strlen(nline);
+
+  inode_stats_buff[off] = 0;
+
+  inode_buf_length = off;
+
+}
+
+void block_stats_to_buf(struct p_block_stats* stats){
+  int off=0;
+  int ratio;
+  char *free_s="free blocks: ";
+  char *used_s="used blocks: ";
+  char *ratio_s="hits ratio: ";
+  char *undef="undefined";
+  char *nline="\n";
+  char free_n[100] = {0};
+  char used_n[100] = {0};
+  char ratio_n[100] = {0};
+
+  if(stats->num_block_access != 0){
+    ratio = stats->hits_in_cache / stats->num_block_access;
+    uitoa(ratio_n,ratio);
+  }else{
+    strcpy(ratio_n,undef);
+  }
+
+  memset(block_stats_buff,0,MAX_STAT_BUF_SIZE);
+
+  //free
+  strcpy(block_stats_buff + off,free_s);
+  off += strlen(free_s);
+  uitoa(free_n,stats->free_blocks_cache);
+  strcpy(block_stats_buff + off,free_n);
+  off += strlen(free_n);
+  strcpy(block_stats_buff + off,nline);
+  off += strlen(nline);
+
+  //used
+  strcpy(block_stats_buff + off,used_s);
+  off += strlen(used_s);
+  uitoa(used_n,stats->used_blocks_cache);
+  strcpy(block_stats_buff + off,used_n);
+  off += strlen(used_n);
+  strcpy(block_stats_buff + off,nline);
+  off += strlen(nline);
+
+  //ratio
+  strcpy(block_stats_buff + off,ratio_s);
+  off += strlen(ratio_s);
+  strcpy(block_stats_buff + off,ratio_n);
+  off += strlen(ratio_n);
+  strcpy(block_stats_buff + off,nline);
+  off += strlen(nline);
+
+  block_stats_buff[off] = 0;
+
+  block_buf_length = off;
+
 }

@@ -188,3 +188,7 @@ void            clearpteu(pde_t *pgdir, char *uva);
 
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))
+
+
+void 	get_inode_stats(struct p_inode_stats *stats);
+void 	get_block_stats(struct p_block_stats *stats);

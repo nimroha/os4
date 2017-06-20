@@ -35,10 +35,16 @@ struct {
   struct buf head;
 } bcache;
 
+static int block_access_count;
+static int cache_hit_count;
+
 void
 binit(void)
 {
   struct buf *b;
+
+  block_access_count = 0;
+  cache_hit_count = 0;
 
   initlock(&bcache.lock, "bcache");
 
@@ -71,6 +77,7 @@ bget(uint dev, uint sector)
     if(b->dev == dev && b->sector == sector){
       if(!(b->flags & B_BUSY)){
         b->flags |= B_BUSY;
+        cache_hit_count++;
         release(&bcache.lock);
         return b;
       }
@@ -99,6 +106,8 @@ struct buf*
 bread(uint dev, uint sector)
 {
   struct buf *b;
+
+  block_access_count++;
 
   b = bget(dev, sector);
   if(!(b->flags & B_VALID))
@@ -141,3 +150,26 @@ brelse(struct buf *b)
 //PAGEBREAK!
 // Blank page.
 
+int
+bio_get_free_blocks_cache(){
+  struct buf *b;
+  int num = 0;
+
+  for(b = bcache.head.prev; b != &bcache.head; b = b->prev){
+    if(!(b->flags & (B_BUSY|B_DIRTY))){
+      num++;
+    }
+  }
+
+  return num;
+}
+
+void
+get_block_stats(struct p_block_stats *stats){
+
+  stats->free_blocks_cache = bio_get_free_blocks_cache();
+  stats->used_blocks_cache = NBUF - stats->free_blocks_cache;
+  stats->num_block_access = block_access_count;
+  stats->hits_in_cache = cache_hit_count;
+
+}

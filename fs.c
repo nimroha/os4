@@ -672,3 +672,52 @@ nameiparent(char *path, char *name)
 {
   return namex(path, 1, name);
 }
+
+
+void
+get_inode_stats(struct p_inode_stats *stats){
+  struct inode *ip;
+  
+  memset(stats,0,sizeof(struct p_inode_stats));
+
+  for(ip = &icache.inode[0]; ip < &icache.inode[NINODE]; ip++){
+    if(ip->ref == 0){
+      stats->free_inodes++;
+    }
+    if(ip->flags & I_VALID){
+      stats->valid_inodes++;
+    }
+    if(ip->flags & I_BUSY){
+      stats->total_used++;
+    }
+    stats->total_refs += ip->ref;
+  }
+}
+
+
+#if 0
+void
+get_block_stats(struct p_block_stats *stats){
+  struct buf *bp=0;
+  struct superblock sb;
+  int b, bi, m;
+
+  stats->used_blocks_cache = bio_get_used_blocks_cache();
+  stats->num_block_access = bio_get_block_access_count();
+  stats->hits_in_cache = bio_get_cache_hit_count();
+
+  stats->free_blocks = 0;
+  readsb(DEFAULT_DEV, &sb);
+  for(b = 0; b < sb.size; b += BPB){
+    bp = bread(DEFAULT_DEV, BBLOCK(b, sb.ninodes));
+    for(bi = 0; bi < BPB && b + bi < sb.size; bi++){
+      m = 1 << (bi % 8);
+      if((bp->data[bi/8] & m) == 0){  // Is block free?
+        stats->free_blocks++;
+      }
+    }
+    brelse(bp);
+  }
+
+}
+#endif

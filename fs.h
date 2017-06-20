@@ -53,3 +53,4 @@ struct dirent {
   char name[DIRSIZ];
 };
 
+#define DEFAULT_DEV 1
