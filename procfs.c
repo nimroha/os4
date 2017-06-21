@@ -293,8 +293,11 @@ proc_set_inode_by_name(int pid, struct inode* ip, char* name)
     ip->sub_type = FD_INFO;
   }else if(strcmp(name,"status") == 0){
     ip->sub_type = STATUS;
+  }else if(strcmp(name,"..") == 0){
+    ip->proc_pid = 0;
+    ip->sub_type = PROC_DIR;
+    ip->size = (DIRENTS_SIZE)*sizeof(struct dirent);
   }
-  
 }
 
 //--------------------------------------------------------------------------
@@ -302,14 +305,21 @@ proc_set_inode_by_name(int pid, struct inode* ip, char* name)
 
 
 void
-fdinfo_set_inode_by_name(struct inode* ip, char* name)
+fdinfo_set_inode_by_name(struct inode* ip, char* name, int pid)
 {
-  int fd;
 
-  fd = atoi(name);
-  ip->proc_fd = fd;
-  ip->sub_type = FD;
-  ip->size = MAX_FDINFO_BUF_SIZE;
+  int fd;
+  // cprintf("iread-fdinfo name:  %s\n", name);//DEBUG
+  if(strcmp(name,"..") == 0){
+    ip->proc_pid = pid;
+    ip->sub_type = PROC;
+    ip->size = 5*sizeof(struct dirent);
+  }else{
+    fd = atoi(name);
+    ip->proc_fd = fd;
+    ip->sub_type = FD;
+    ip->size = MAX_FDINFO_BUF_SIZE;
+  }
 }
 
 
@@ -383,7 +393,7 @@ procfsiread(struct inode* dp, struct inode *ip) {
       // cprintf("--procfsiread FD_INFO--\n");//DEBUG
       p =  lookup_proc_py_pid(dp->proc_pid);
       if((i = fdinfo_lookup_cell_by_inum(dp->proc_pid,ip->inum)) < 0) panic("iread: dirent not in fdinfo");
-      fdinfo_set_inode_by_name(ip, p->fdinfo_dirents[i].name);
+      fdinfo_set_inode_by_name(ip, p->fdinfo_dirents[i].name, dp->proc_pid);
       ip->proc_pid = dp->proc_pid;
       break;
 
