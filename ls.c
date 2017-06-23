@@ -47,7 +47,7 @@ ls(char *path)
     break;
 
   case T_DEV:
-   printf(1, "ls: type = DEV\n");
+   //printf(1, "ls: type = DEV\n"); //DEBUG
   case T_DIR:
     if(strlen(path) + 1 + DIRSIZ + 1 > sizeof buf){
       printf(1, "ls: path too long\n");

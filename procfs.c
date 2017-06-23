@@ -12,14 +12,17 @@
 #include "x86.h"
 #define BUFF_SIZE 512
 
-#define MAX_STAT_BUF_SIZE 2048
+#define MAX_STAT_BUF_SIZE   2048
 #define MAX_FDINFO_BUF_SIZE 1024
+#define MAX_PROC_STATUS_BUF_SIZE 600
 
 struct proc* lookup_proc_py_pid(int pid);
 int proc_dir_lookup_empty_cell(void);
 void inode_stats_to_buf(struct p_inode_stats*);
 void block_stats_to_buf(struct p_block_stats*);
 void fd_info_to_buf(int fd,struct file *f);
+void status_to_buf(struct proc *);
+
 
 static struct p_dirent proc_dir_dirents[DIRENTS_SIZE];
 static struct p_block_stats block_stats = {0};
@@ -27,17 +30,62 @@ static struct p_inode_stats inode_stats = {0};
 static char   inode_stats_buff[MAX_STAT_BUF_SIZE];
 static char   block_stats_buff[MAX_STAT_BUF_SIZE];
 static char   fd_info_buff[MAX_FDINFO_BUF_SIZE];
+static char   status_buff[MAX_PROC_STATUS_BUF_SIZE];
 static int    inode_buf_length;
 static int    block_buf_length;
 static int    fd_info_buf_length;
+static int    status_buf_length;
+
+int
+cat_fdinfo_dir(char *dst, int off, int n, struct proc *p){
+  int i,m=0,k=sizeof(p->fdinfo_dirents[0]);
+
+  //cprintf("I:   m=%d n=%d k=%d\n",m,n,k); //DEBUG
+  if(off + n > sizeof(p->fdinfo_dirents)){
+    n = sizeof(p->fdinfo_dirents) - off;
+    if(n <= 0){
+      return 0;
+    }
+  }
+  //cprintf("II:  m=%d n=%d k=%d\n",m,n,k); //DEBUG
+
+  for(i=0 ; i<FDINFO_DIRENTS_SIZE ; i++){
+    if(p->fdinfo_dirents[i].inum != 0){
+      if(m + k > n){
+        k = n-m;
+      }
+      //cprintf("III: m=%d n=%d k=%d\n",m,n,k); //DEBUG
+      memmove(dst + m, (char*)(p->fdinfo_dirents) + off + m, k);
+      m += k;
+    }
+  }
+  return m;
+}
+
+int
+cat_proc_status(char *dst, int off, int n, struct proc *p){
+
+  status_to_buf(p);
+
+  if(off+n > status_buf_length){
+    n = status_buf_length - off;
+    if(n > 0){
+      memmove(dst + off,status_buff + off,n);
+    }else{
+      n = 0;
+    }
+  }else{
+    memmove(dst + off,status_buff + off,n);  
+  }
+
+  return n;
+}
 
 int
 cat_fdinfo_file(char *dst, int off, int n, int fd, struct file *f){
 
-  if(off == 0){
-    cprintf("cat_fdinfo_file: fetching data\n");//DEBUG
-    fd_info_to_buf(fd,f);
-  }
+  //cprintf("cat_fdinfo_file: fetching data\n");//DEBUG
+  fd_info_to_buf(fd,f);
 
   if(off+n > fd_info_buf_length){
     n = fd_info_buf_length - off;
@@ -57,7 +105,7 @@ int
 cat_inode_stats(char *dst, int off, int n){
 
   if(off == 0){
-    cprintf("cat_inode_stats: fetching data\n");//DEBUG
+    //cprintf("cat_inode_stats: fetching data\n");//DEBUG
     get_inode_stats(&inode_stats);
     inode_stats_to_buf(&inode_stats);
   }
@@ -80,7 +128,7 @@ int
 cat_block_stats(char *dst, int off, int n){
 
   if(off == 0){
-    cprintf("cat_block_stats: fetching data\n");//DEBUG
+    // cprintf("cat_block_stats: fetching data\n");//DEBUG
     get_block_stats(&block_stats);
     block_stats_to_buf(&block_stats);
   }
@@ -238,7 +286,7 @@ void
 size_to_str(char* dest, uint sz)
 { 
   int off;
-  char size[]="Size: ";
+  char size[]="Mem size: ";
   off = strlen(size);
   strcpy(dest, size);
   uitoa((char*)(dest + off),  sz);
@@ -407,9 +455,6 @@ procfsiread(struct inode* dp, struct inode *ip) {
 int
 procfsread(struct inode *ip, char *dst, int off, int n) {
   struct proc* p;
-  char status[25];
-  char size[25];
-  int len , offset;
   int fd;
   struct file *f;
 
@@ -417,7 +462,12 @@ procfsread(struct inode *ip, char *dst, int off, int n) {
 
     case PROC_DIR:
       //cprintf("procfsread: PROC_DIR - off=%d size=%d\n",off,n);//DEBUG
-      if(off + n > sizeof(proc_dir_dirents)) return 0; 
+      if(off + n > sizeof(proc_dir_dirents)){
+        n = sizeof(proc_dir_dirents) - off;
+        if(n <= 0){
+          return 0;
+        }
+      } 
       memmove(dst, (char*)proc_dir_dirents + off, n);
       return n;
       break;
@@ -425,30 +475,31 @@ procfsread(struct inode *ip, char *dst, int off, int n) {
     case PROC:
       //cprintf("procfsread: PROC - off=%d size=%d\n",off,n);//DEBUG
       p = lookup_proc_py_pid(ip->proc_pid);
-      if(off + n > sizeof(p->proc_dirents)) return 0; 
-      memmove(dst, (char*)(p->proc_dirents) + off, n);
+      if(off + n > sizeof(p->proc_dirents)){
+        n = sizeof(p->proc_dirents) - off;
+        if(n <= 0){
+          return 0;
+        }
+      } 
+      memmove(dst, (char*)(p->proc_dirents) + off, n);//TODO deal with this like in fdinfo_dirents?
       return n;
       break;
 
     case STATUS:
-      if( (off + n) > BUFF_SIZE) return 0; 
-      p =  lookup_proc_py_pid(ip->proc_pid);
-      status_to_str(status, p->state);
-      len = strlen(status);
-      memmove(dst,status,len);
-      offset = len;
-      size_to_str(size, p->sz);
-      len = strlen(size);
-      memmove(dst + offset ,size,len);
-      return offset + len;
+      if( (off + n) > MAX_PROC_STATUS_BUF_SIZE){
+        n = MAX_PROC_STATUS_BUF_SIZE - off;
+        if(n <= 0){
+          return 0;
+        }
+      }
+      p = lookup_proc_py_pid(ip->proc_pid);
+      return cat_proc_status(dst,off,n,p);
       break;
 
     case FD_INFO:
-      //cprintf("procfsread: FD_INFO - off=%d size=%d\n",off,n);//DEBUG
+      //cprintf("procfsread: FD_INFO - off=%d size=%d max_size=%d\n",off,n,sizeof(p->fdinfo_dirents));//DEBUG
       p = lookup_proc_py_pid(ip->proc_pid);
-      if(off + n > sizeof(p->fdinfo_dirents)) return 0; 
-      memmove(dst, (char*)(p->fdinfo_dirents) + off, n);
-      return n;
+      return cat_fdinfo_dir(dst,off,n,p);
       break;
 
     case FD:
@@ -456,19 +507,34 @@ procfsread(struct inode *ip, char *dst, int off, int n) {
       p = lookup_proc_py_pid(ip->proc_pid);
       fd = ip->proc_fd;
       f = p->ofile[fd];
-      if(off + n > MAX_FDINFO_BUF_SIZE) return 0;
+      if( (off + n) > MAX_FDINFO_BUF_SIZE){
+        n = MAX_FDINFO_BUF_SIZE - off;
+        if(n <= 0){
+          return 0;
+        }
+      }
       return cat_fdinfo_file(dst,off,n,fd,f);
       break;
 
     case BLOCK_STAT:
       //cprintf("procfsread: BLOCK_STAT - off=%d size=%d\n",off,n);//DEBUG
-      if(off + n > MAX_STAT_BUF_SIZE) return 0;
+      if( (off + n) > MAX_STAT_BUF_SIZE){
+        n = MAX_STAT_BUF_SIZE - off;
+        if(n <= 0){
+          return 0;
+        }
+      }
       return cat_block_stats(dst,off,n);
       break;
 
     case INODE_STAT:
       //cprintf("procfsread: INODE_STAT - off=%d size=%d\n",off,n);//DEBUG
-      if(off + n > MAX_STAT_BUF_SIZE) return 0;
+      if( (off + n) > MAX_STAT_BUF_SIZE){
+        n = MAX_STAT_BUF_SIZE - off;
+        if(n <= 0){
+          return 0;
+        }
+      }
       return cat_inode_stats(dst,off,n);
       break;
 
@@ -512,6 +578,21 @@ procfsinit(void)
   devsw[PROCFS].write = procfswrite;
   devsw[PROCFS].read = procfsread;
 }
+
+void status_to_buf(struct proc *p){
+  char status[25] = {0};
+  char size[25] = {0};
+
+  memset(status_buff,0,MAX_PROC_STATUS_BUF_SIZE);
+
+  status_to_str(status, p->state);
+  size_to_str(size, p->sz);
+  strcpy(status_buff,status);
+  strcpy(status_buff + strlen(status),size);
+
+  status_buf_length = strlen(status_buff);
+}
+
 
 void inode_stats_to_buf(struct p_inode_stats* stats){
   int off=0;
