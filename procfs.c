@@ -703,7 +703,7 @@ void block_stats_to_buf(struct p_block_stats* stats){
 
 }
 
-void fd_info_to_buf(int fd,struct p_file *f){
+void fd_info_to_buf(int fd,struct file *f){
   int off = 0;
   char *name_s="name: ";
   char *type_s="type: ";
