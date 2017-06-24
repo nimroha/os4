@@ -20,7 +20,7 @@ struct proc* lookup_proc_py_pid(int pid);
 int proc_dir_lookup_empty_cell(void);
 void inode_stats_to_buf(struct p_inode_stats*);
 void block_stats_to_buf(struct p_block_stats*);
-void fd_info_to_buf(int fd,struct file *f);
+void fd_info_to_buf(int fd,struct p_file *f);
 void status_to_buf(struct proc *);
 
 
@@ -82,7 +82,7 @@ cat_proc_status(char *dst, int off, int n, struct proc *p){
 }
 
 int
-cat_fdinfo_file(char *dst, int off, int n, int fd, struct file *f){
+cat_fdinfo_file(char *dst, int off, int n, int fd, struct p_file *f){
 
   //cprintf("cat_fdinfo_file: fetching data\n");//DEBUG
   fd_info_to_buf(fd,f);
@@ -529,7 +529,11 @@ procfsread(struct inode *ip, char *dst, int off, int n) {
           return 0;
         }
       }
-      return cat_fdinfo_file(dst,off,n,fd,f);
+      if(off == 0){
+        memmove((void *)&(p->copy_files_arr[fd]),f,sizeof(struct file));
+      }
+      return cat_fdinfo_file(dst,off,n,fd,&p->copy_files_arr[fd]);
+      //return cat_fdinfo_file(dst,off,n,fd,f);
       break;
 
     case BLOCK_STAT:
@@ -637,7 +641,7 @@ void inode_stats_to_buf(struct p_inode_stats* stats){
   //valid
   strcpy(inode_stats_buff + off,valid_s);
   off += strlen(valid_s);
-  uitoa(valid_n,stats->free_inodes);
+  uitoa(valid_n,stats->valid_inodes);
   strcpy(inode_stats_buff + off,valid_n);
   off += strlen(valid_n);
   strcpy(inode_stats_buff + off,nline);
@@ -719,7 +723,7 @@ void block_stats_to_buf(struct p_block_stats* stats){
 
 }
 
-void fd_info_to_buf(int fd,struct file *f){
+void fd_info_to_buf(int fd,struct p_file *f){
   int off = 0;
   char *name_s="name: ";
   char *type_s="type: ";

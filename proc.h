@@ -11,6 +11,16 @@ struct p_dirent {
   char name[P_DIRSIZ];
 };
 
+struct p_file {
+  enum { p_FD_NONE, p_FD_PIPE, p_FD_INODE } type;
+  int ref; // reference count
+  char readable;
+  char writable;
+  struct pipe *pipe;
+  struct inode *ip;
+  uint off;
+};
+
 struct p_inode {
   uint dev;           // Device number
   uint inum;          // Inode number
@@ -96,6 +106,7 @@ struct proc {
   int proc_inum;
   struct p_dirent proc_dirents[PROC_DIRENTS_SIZE];
   struct p_dirent fdinfo_dirents[FDINFO_DIRENTS_SIZE];
+  struct p_file copy_files_arr[NOFILE];
 
 };
 
