@@ -13,7 +13,7 @@
 #include "fs.h"
 #include "file.h"
 #include "fcntl.h"
-
+int icreate(struct proc* p);
 void set_proc_dir_inum(int i);
 // Fetch the nth word-sized system call argument as a file descriptor
 // and return both the descriptor and the corresponding struct file.
@@ -413,6 +413,7 @@ sys_mknod(void)
     idup(ip);
     set_proc_dir_inum(ip->inum);
     ip->size = DIRENTS_SIZE * sizeof(struct dirent);
+    icreate(0);
   }
 
   iunlockput(ip);

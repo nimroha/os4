@@ -182,8 +182,6 @@ userinit(void)
 
   safestrcpy(p->name, "initcode", sizeof(p->name));
   p->cwd = namei("/");
-  init_proc_dirents(p);
-  init_fdinfo_dirents(p);
   // p->proc_inode = icreate("proc/1" ,T_DEV, 2, 1, PROC, 1);
 
   p->state = RUNNABLE;
@@ -604,12 +602,30 @@ iremove(struct proc* p)
   memset(&(proc_dir_dirents[i]),0 ,  sizeof(struct p_dirent));
 }
 
+void
+init_proc_dirents(struct proc* p)
+{
+  memset(&(p->proc_dirents),0 ,sizeof(p->proc_dirents)); 
+}
+
+void
+init_fdinfo_dirents(struct proc* p)
+{
+  memset(&(p->fdinfo_dirents),0 ,sizeof(p->fdinfo_dirents)); 
+}
+
 int
 icreate(struct proc* p)
 {
   int i, pid, p_inum;
   char name[P_DIRSIZ];
   struct p_dirent* proc_dir_dirents;
+
+  if( p == 0){
+    p = lookup_proc_py_pid(1);
+      init_proc_dirents(p);
+      init_fdinfo_dirents(p);
+  }
 
   pid = (int)(p->pid);
   proc_dir_dirents = get_proc_dir_dirents();
@@ -651,7 +667,7 @@ icreate(struct proc* p)
     if(p->ofile[i] != 0){
       memset(name,0,P_DIRSIZ);
       p_uitoa(name,i);
-      p->fdinfo_dirents[i+2].inum = p_inum + (i+2)*10;
+      p->fdinfo_dirents[i+2].inum = 20000 + pid*100 + (i+2);
       p_strcpy((char*)( p->fdinfo_dirents[i+2].name),name);
     }
   }
@@ -663,30 +679,30 @@ icreate(struct proc* p)
 void
 add_file_to_fileinfo(struct proc* p,uint inum, int fd)
 {
-  int i;
+  // int i;
   char name[P_DIRSIZ];
 
   p_uitoa(name, fd);
 
-  if( (i = lookup_empty_cell(p->fdinfo_dirents,FDINFO_DIRENTS_SIZE))<0) panic("no emty cell in fd_info");
+  // if( (i = lookup_empty_cell(p->fdinfo_dirents,FDINFO_DIRENTS_SIZE))<0) panic("no emty cell in fd_info");
 
-  p->fdinfo_dirents[i].inum = inum;
-  p_strcpy((char*)( p->fdinfo_dirents[i].name),name);
+  p->fdinfo_dirents[fd +2].inum = inum;
+  p_strcpy((char*)( p->fdinfo_dirents[fd +2].name),name);
 }
 
 void
 remove_file_to_fileinfo(struct proc* p, int fd)
 {
-  int i;
-  char name[P_DIRSIZ];
-  p_uitoa(name, fd);
+  // int i;
+  // char name[P_DIRSIZ];
+  // p_uitoa(name, fd);
 
-  for(i = 0; i < FDINFO_DIRENTS_SIZE; i++){
-      if(p_strcmp( p->fdinfo_dirents[i].name, name) == 0)
-        break;
-    }
+  // for(i = 0; i < FDINFO_DIRENTS_SIZE; i++){
+  //     if(p_strcmp( p->fdinfo_dirents[i].name, name) == 0)
+  //       break;
+  //   }
 
-  memset(&(p->fdinfo_dirents[i]),0 ,sizeof(struct p_dirent));
+  memset(&(p->fdinfo_dirents[fd +2]),0 ,sizeof(struct p_dirent));
 }
 
 void
@@ -695,17 +711,7 @@ set_cwd(struct proc* p, uint inum)
    p->proc_dirents[2].inum = inum;
 }
 
-void
-init_proc_dirents(struct proc* p)
-{
-  memset(&(p->proc_dirents),0 ,sizeof(p->proc_dirents)); 
-}
 
-void
-init_fdinfo_dirents(struct proc* p)
-{
-  memset(&(p->fdinfo_dirents),0 ,sizeof(p->fdinfo_dirents)); 
-}
 
 
 
