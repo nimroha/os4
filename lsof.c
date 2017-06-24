@@ -113,7 +113,7 @@ main(int argc, char *argv[]){
 							//printf(1,"before read %s\n",file_name); //DEBUG
 							n = read(file_fd,fileinfo_buffer,FILEINFO_BUF_SIZE);
 							//printf(1,"after read %s\n",file_name); //DEBUG
-							if(n>0){
+							if(n>0 && *fileinfo_buffer == 'n'){
 								//printf(1,"local fd=%d\n",file_fd);//DEBUG
 								//printf(1,"read %d bytes\n",n); //DEBUG
 								//printf(1,"%s",fileinfo_buffer);//DEBUG
