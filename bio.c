@@ -71,6 +71,8 @@ bget(uint dev, uint sector)
 
   acquire(&bcache.lock);
 
+ block_access_count++;
+ 
  loop:
   // Is the sector already cached?
   for(b = bcache.head.next; b != &bcache.head; b = b->next){
@@ -107,7 +109,6 @@ bread(uint dev, uint sector)
 {
   struct buf *b;
 
-  block_access_count++;
 
   b = bget(dev, sector);
   if(!(b->flags & B_VALID))

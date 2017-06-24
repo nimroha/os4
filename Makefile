@@ -175,6 +175,7 @@ UPROGS=\
 	_zombie\
 	_sanity\
 	_lsof\
+	_sanity\
 
 fs.img: mkfs README $(UPROGS)
 	./mkfs fs.img README $(UPROGS)

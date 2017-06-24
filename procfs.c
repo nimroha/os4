@@ -596,22 +596,16 @@ void status_to_buf(struct proc *p){
 
 void inode_stats_to_buf(struct p_inode_stats* stats){
   int off=0;
-  int ratio;
   char *free_s="free inodes: ";
   char *valid_s="valid inodes: ";
   char *ratio_s="refs per inode: ";
-  char *undef="undefined";
   char *nline="\n";
+  char *div=" / ";
   char free_n[100] = {0};
   char valid_n[100] = {0};
-  char ratio_n[100] = {0};
+  char refs_n[100] = {0};
+  char used_n[100] = {0};
 
-  if(stats->total_used != 0){
-    ratio = stats->total_refs / stats->total_used;
-    uitoa(ratio_n,ratio);
-  }else{
-    strcpy(ratio_n, undef);
-  }
 
   memset(inode_stats_buff,0,MAX_STAT_BUF_SIZE);
 
@@ -636,8 +630,14 @@ void inode_stats_to_buf(struct p_inode_stats* stats){
   //ratio
   strcpy(inode_stats_buff + off,ratio_s);
   off += strlen(ratio_s);
-  strcpy(inode_stats_buff + off,ratio_n);
-  off += strlen(ratio_n);
+  uitoa(refs_n,stats->total_refs);
+  strcpy(inode_stats_buff + off,refs_n);
+  off += strlen(refs_n);
+  strcpy(inode_stats_buff + off,div);
+  off += strlen(div);
+  uitoa(used_n,stats->total_used);
+  strcpy(inode_stats_buff + off,used_n);
+  off += strlen(used_n);
   strcpy(inode_stats_buff + off,nline);
   off += strlen(nline);
 
@@ -649,22 +649,16 @@ void inode_stats_to_buf(struct p_inode_stats* stats){
 
 void block_stats_to_buf(struct p_block_stats* stats){
   int off=0;
-  int ratio;
   char *free_s="free blocks: ";
   char *used_s="used blocks: ";
   char *ratio_s="hits ratio: ";
-  char *undef="undefined";
   char *nline="\n";
+  char *div=" / ";
   char free_n[100] = {0};
   char used_n[100] = {0};
-  char ratio_n[100] = {0};
+  char hits_n[100] = {0};
+  char access_n[100] = {0};
 
-  if(stats->num_block_access != 0){
-    ratio = stats->hits_in_cache / stats->num_block_access;
-    uitoa(ratio_n,ratio);
-  }else{
-    strcpy(ratio_n,undef);
-  }
 
   memset(block_stats_buff,0,MAX_STAT_BUF_SIZE);
 
@@ -687,10 +681,19 @@ void block_stats_to_buf(struct p_block_stats* stats){
   off += strlen(nline);
 
   //ratio
+  //cprintf("blockstat: hits=%d access=%d\n",stats->hits_in_cache,stats->num_block_access); //DEBUG
   strcpy(block_stats_buff + off,ratio_s);
   off += strlen(ratio_s);
-  strcpy(block_stats_buff + off,ratio_n);
-  off += strlen(ratio_n);
+  uitoa(hits_n,stats->hits_in_cache);
+  //cprintf("hits %s length=%d\n",hits_n, strlen(hits_n)); //DEBUG
+  strcpy(block_stats_buff + off,hits_n);
+  off += strlen(hits_n);
+  strcpy(block_stats_buff + off,div);
+  off += strlen(div);
+  uitoa(access_n,stats->num_block_access);
+  //cprintf("access %s\n",access_n); //DEBUG
+  strcpy(block_stats_buff + off,access_n);
+  off += strlen(access_n);
   strcpy(block_stats_buff + off,nline);
   off += strlen(nline);
 
@@ -700,7 +703,7 @@ void block_stats_to_buf(struct p_block_stats* stats){
 
 }
 
-void fd_info_to_buf(int fd,struct file *f){
+void fd_info_to_buf(int fd,struct p_file *f){
   int off = 0;
   char *name_s="name: ";
   char *type_s="type: ";
