@@ -44,7 +44,7 @@ fdalloc(struct file *f)
   for(fd = 0; fd < NOFILE; fd++){
     if(proc->ofile[fd] == 0){
       proc->ofile[fd] = f;
-      add_file_to_fileinfo(proc, f->ip->inum, fd);
+      // add_file_to_fileinfo(proc, f->ip->inum, fd);
       return fd;
     }
   }
@@ -98,7 +98,7 @@ sys_close(void)
   if(argfd(0, &fd, &f) < 0)
     return -1;
   proc->ofile[fd] = 0;
-  remove_file_to_fileinfo(proc, fd);
+  // remove_file_to_fileinfo(proc, fd);
   fileclose(f);
   return 0;
 }

@@ -664,12 +664,12 @@ icreate(struct proc* p)
   p_strcpy((char*)( p->fdinfo_dirents[1].name),"..");
 
   for(i=0 ; i<NOFILE ; i++){
-    if(p->ofile[i] != 0){
+
       memset(name,0,P_DIRSIZ);
       p_uitoa(name,i);
       p->fdinfo_dirents[i+2].inum = 20000 + pid*100 + (i+2);
       p_strcpy((char*)( p->fdinfo_dirents[i+2].name),name);
-    }
+    
   }
 
   return p_inum;

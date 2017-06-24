@@ -417,7 +417,7 @@ void
 procfsiread(struct inode* dp, struct inode *ip) {
   int i;
   struct proc *p;
-  // cprintf("--procfsiread--\n");//DEBUG
+  // cprintf("--procfsiread-- inum: %d\n",ip->inum);//DEBUG
 
   ip->major = 2;
   ip->type = T_DEV;
@@ -455,8 +455,9 @@ procfsiread(struct inode* dp, struct inode *ip) {
 int
 procfsread(struct inode *ip, char *dst, int off, int n) {
   struct proc* p;
-  int fd;
+  int fd, fdex;
   struct file *f;
+  // cprintf("--procfsread-- inum: %d\n",ip->inum);//DEBUG
 
   switch(ip->sub_type){
 
@@ -497,13 +498,26 @@ procfsread(struct inode *ip, char *dst, int off, int n) {
       break;
 
     case FD_INFO:
-      //cprintf("procfsread: FD_INFO - off=%d size=%d max_size=%d\n",off,n,sizeof(p->fdinfo_dirents));//DEBUG
+      // cprintf("procfsread: FD_INFO - off=%d size=%d max_size=%d\n",off,n,sizeof(p->fdinfo_dirents));//DEBUG
       p = lookup_proc_py_pid(ip->proc_pid);
-      return cat_fdinfo_dir(dst,off,n,p);
+      // return cat_fdinfo_dir(dst,off,n,p);
+      if(off + n > sizeof(p->fdinfo_dirents)){
+        n = sizeof(p->fdinfo_dirents) - off;
+        if(n <= 0){
+          return 0;
+        }
+      } 
+      fdex = off/sizeof(struct dirent);
+      if(p->ofile[fdex-2] ||  fdex < 2){
+        memmove(dst, (char*)(p->fdinfo_dirents) + off, n);
+      }else{
+        memset(dst, 0, n);
+      } 
+      return n;
       break;
 
     case FD:
-      //cprintf("procfsread: FD - off=%d size=%d\n",off,n);//DEBUG
+      // cprintf("procfsread: FD - off=%d size=%d\n",off,n);//DEBUG
       p = lookup_proc_py_pid(ip->proc_pid);
       fd = ip->proc_fd;
       f = p->ofile[fd];
