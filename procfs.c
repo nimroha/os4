@@ -507,6 +507,8 @@ procfsread(struct inode *ip, char *dst, int off, int n) {
           return 0;
         }
       } 
+      if(n > sizeof(struct dirent)) n = sizeof(struct dirent);
+      
       fdex = off/sizeof(struct dirent);
       if(p->ofile[fdex-2] ||  fdex < 2){
         memmove(dst, (char*)(p->fdinfo_dirents) + off, n);
